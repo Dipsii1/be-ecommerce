@@ -9,9 +9,12 @@
   "scripts": {
     "start": "node ./bin/www",
     "dev": "nodemon -w ./*.js ./*.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "vercel-build": "prisma generate && prisma migrate deploy"
   },
   "dependencies": {
+    "@prisma/client": "^6.16.1",
+    "@prisma/extension-accelerate": "^2.0.2",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "dotenv": "^17.2.2",
@@ -26,7 +29,8 @@
     "globals": "^16.4.0",
     "husky": "^9.1.7",
     "nodemon": "^3.1.10",
-    "prettier": "^3.6.2"
+    "prettier": "^3.6.2",
+    "prisma": "^6.16.1"
   },
   "lint-staged": {
     "*.js": [
