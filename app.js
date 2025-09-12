@@ -1,6 +1,5 @@
 require('dotenv').config();
 
-
 // Import Module & Declare Variable
 var createError = require('http-errors');
 var express = require('express');
