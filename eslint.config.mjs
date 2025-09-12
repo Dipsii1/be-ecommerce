@@ -1,12 +1,21 @@
-import js from '@eslint/js';
-import globals from 'globals';
-import { defineConfig } from 'eslint/config';
+import globals from "globals";
+import pluginJs from "@eslint/js";
 
-export default defineConfig([
+
+/** @type {import('eslint').Linter.Config[]} */
+export default [
+  {files: ["**/*.js"], languageOptions: {sourceType: "module"}},
+  {languageOptions: { globals: { ...globals.node, ...globals.es2021 } }},
+  pluginJs.configs.recommended,
   {
-    files: ['**/*.{js,mjs,cjs}'],
-    plugins: { js },
-    extends: ['js/recommended'],
-    languageOptions: { globals: globals.node },
+    "rules": {
+      "no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_",
+          "varsIgnorePattern": "^_"
+        }
+      ]
+    }
   },
-]);
+];
