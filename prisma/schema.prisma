@@ -1,10 +1,37 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" 
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation ke MerchantProfile
+  merchantProfile MerchantProfile?
+
+  @@map("users")
+}
+
+model MerchantProfile {
+  id        Int     @id @default(autoincrement())
+  shopName  String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  verified  Boolean @default(false)
+  userId    Int     @unique
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("merchant_profiles")
+}

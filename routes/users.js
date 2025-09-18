@@ -19,10 +19,40 @@ router.get('/', async function (req, res) {
   res.json(users);
 });
 
+router.get('/merchant', async function (req, res) {
+  const merchant = await prisma.user.findMany({
+    where: { role: 'merchant' },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      role: true,
+      merchantProfile: {
+        select: {
+          shopName: true,
+          address: true,
+          verified: true,
+        },
+      },
+    },
+  });
+  res.json(merchant);
+});
+
 // Create User (Register)
 router.post('/register', async function (req, res) {
   try {
-    const { username, email, password, role, shopName } = req.body;
+    const {
+      username,
+      email,
+      password,
+      role,
+      shopName,
+      address,
+      city,
+      latitude,
+      longitude,
+    } = req.body;
 
     if (!username || !email || !password || !role) {
       return res
@@ -61,6 +91,10 @@ router.post('/register', async function (req, res) {
             ? {
                 create: {
                   shopName,
+                  address,
+                  city,
+                  latitude,
+                  longitude,
                   verified: false,
                 },
               }
@@ -192,6 +226,7 @@ router.get('/me', verifyToken, async function (req, res) {
         username: true,
         email: true,
         role: true,
+        merchantProfile: true,
         // Tidak menampilkan password
       },
     });
