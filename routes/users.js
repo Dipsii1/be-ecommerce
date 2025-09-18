@@ -13,6 +13,7 @@ router.get('/', async function (req, res) {
       id: true,
       username: true,
       email: true,
+      role: true,
     },
   });
   res.json(users);
@@ -21,12 +22,22 @@ router.get('/', async function (req, res) {
 // Create User (Register)
 router.post('/register', async function (req, res) {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, role, shopName } = req.body;
 
-    if (!username || !email || !password) {
+    if (!username || !email || !password || !role) {
       return res
         .status(400)
-        .json({ error: 'Username, email dan password diperlukan' });
+        .json({ error: 'Username, email, password dan role diperlukan!' });
+    }
+
+    if (role === 'merchant' && !shopName) {
+      return res
+        .status(400)
+        .json({ error: 'Shop name diperlukan untuk role merchant!' });
+    }
+
+    if (role !== 'customer' && role !== 'merchant') {
+      return res.status(400).json({ error: 'Role tidak valid' });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -44,6 +55,16 @@ router.post('/register', async function (req, res) {
         username,
         email,
         password: hashedPassword,
+        role,
+        merchantProfile:
+          role === 'merchant'
+            ? {
+                create: {
+                  shopName,
+                  verified: false,
+                },
+              }
+            : undefined,
       },
     });
 
@@ -170,6 +191,7 @@ router.get('/me', verifyToken, async function (req, res) {
         id: true,
         username: true,
         email: true,
+        role: true,
         // Tidak menampilkan password
       },
     });
