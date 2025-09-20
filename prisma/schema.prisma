@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" 
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -12,26 +12,44 @@ model User {
   username  String   @unique
   email     String   @unique
   password  String
-  role      String
+  role      String   @default("user")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relation ke MerchantProfile
-  merchantProfile MerchantProfile?
 
   @@map("users")
 }
 
 model MerchantProfile {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   shopName  String
+  email     String   @unique
+  password  String   
   address   String?
   latitude  Float?
   longitude Float?
-  verified  Boolean @default(false)
-  userId    Int     @unique
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("merchant")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // relasi ke Product (1:N)
+  products Product[]
 
   @@map("merchant_profiles")
+}
+
+model Product {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  stock       Int       @default(0)
+  expired     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  merchantId  Int
+
+  // relasi ke MerchantProfile
+  merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("products")
 }

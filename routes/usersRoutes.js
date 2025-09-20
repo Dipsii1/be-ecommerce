@@ -19,55 +19,15 @@ router.get('/', async function (req, res) {
   res.json(users);
 });
 
-router.get('/merchant', async function (req, res) {
-  const merchant = await prisma.user.findMany({
-    where: { role: 'merchant' },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      role: true,
-      merchantProfile: {
-        select: {
-          shopName: true,
-          address: true,
-          verified: true,
-        },
-      },
-    },
-  });
-  res.json(merchant);
-});
-
-// Create User (Register)
-router.post('/register', async function (req, res) {
+// Create user (register)
+router.post('/register', async (req, res) => {
   try {
-    const {
-      username,
-      email,
-      password,
-      role,
-      shopName,
-      address,
-      city,
-      latitude,
-      longitude,
-    } = req.body;
+    const { username, email, password } = req.body;
 
-    if (!username || !email || !password || !role) {
+    if (!username || !email || !password) {
       return res
         .status(400)
-        .json({ error: 'Username, email, password dan role diperlukan!' });
-    }
-
-    if (role === 'merchant' && !shopName) {
-      return res
-        .status(400)
-        .json({ error: 'Shop name diperlukan untuk role merchant!' });
-    }
-
-    if (role !== 'customer' && role !== 'merchant') {
-      return res.status(400).json({ error: 'Role tidak valid' });
+        .json({ error: 'Username, email, dan password diperlukan!' });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -80,33 +40,19 @@ router.post('/register', async function (req, res) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         username,
         email,
         password: hashedPassword,
-        role,
-        merchantProfile:
-          role === 'merchant'
-            ? {
-                create: {
-                  shopName,
-                  address,
-                  city,
-                  latitude,
-                  longitude,
-                  verified: false,
-                },
-              }
-            : undefined,
+        role: 'user', // default user
       },
     });
 
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _, ...userWithoutPassword } = newUser;
     res.status(201).json(userWithoutPassword);
   } catch (error) {
-    console.error('Error saat registrasi:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan saat registrasi' });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -136,7 +82,7 @@ router.post('/login', async function (req, res) {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -212,7 +158,10 @@ const verifyToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ err });
+    console.log(err);
+    return res
+      .status(401)
+      .json({ error: 'Token tidak valid atau sudah kadaluarsa' });
   }
 };
 
@@ -226,7 +175,6 @@ router.get('/me', verifyToken, async function (req, res) {
         username: true,
         email: true,
         role: true,
-        merchantProfile: true,
         // Tidak menampilkan password
       },
     });

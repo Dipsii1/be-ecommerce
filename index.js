@@ -9,7 +9,9 @@ var logger = require('morgan');
 
 // import DB Conection
 var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
+var usersRouter = require('./routes/usersRoutes');
+var merchantRoutes = require('./routes/merchantRoutes');
+var productRoutes = require('./routes/productRoutes');
 
 var app = express();
 
@@ -22,6 +24,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Define Routes
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+app.use('/products', productRoutes);
+app.use('/merchants', merchantRoutes);
 
 // Handle Error
 app.use(function (req, res, next) {
