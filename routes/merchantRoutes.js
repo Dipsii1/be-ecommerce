@@ -6,8 +6,11 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+// import data mechant dai json
+const merchantData = require('../data/resto_jakarta.json');
+
 // Get All Merchants
-router.get('/', async function (req, res) {
+router.get('/', async function (_req, res) {
   try {
     const merchants = await prisma.merchantProfile.findMany({
       select: {
@@ -155,6 +158,37 @@ router.get('/me', verifyToken, async function (req, res) {
     res
       .status(500)
       .json({ error: 'Terjadi kesalahan saat mengambil data merchant' });
+  }
+});
+
+// Seed merchant data from JSON
+
+router.post('/seed-merchants', async function (res, _req) {
+  try {
+    for (const merchant of merchantData) {
+      const existingMerchant = await prisma.merchantProfile.findUnique({
+        where: { email: merchant.email },
+      });
+
+      if (!existingMerchant) {
+        await prisma.merchantProfile.create({
+          data: {
+            shopName: merchant.shopName,
+            email: merchant.email,
+            password: bcrypt.hashSync(merchant.password, 10), // Hash password
+            address: merchant.address,
+            latitude: merchant.latitude,
+            longitude: merchant.longitude,
+          },
+        });
+      }
+    }
+    res.status(201).json({ message: 'Merchant data seeded successfully' });
+  } catch (error) {
+    console.error('Error seeding merchant data:', error);
+    res
+      .status(500)
+      .json({ error: 'Terjadi kesalahan saat menambahkan data merchant' });
   }
 });
 

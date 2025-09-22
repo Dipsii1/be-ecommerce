@@ -10,7 +10,8 @@
     "start": "node ./bin/www",
     "dev": "nodemon -w ./*.js ./*.js",
     "prepare": "husky",
-    "vercel-build": "prisma generate && prisma migrate deploy"
+    "vercel-build": "prisma generate && prisma migrate deploy",
+    "seed": "node ./prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.1",
@@ -19,11 +20,11 @@
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "dotenv": "^17.2.2",
-    "express": "~4.16.1",
+    "express": "^4.21.2",
     "http-errors": "~1.6.3",
-    "jade": "~1.11.0",
+    "jade": "^0.29.0",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "~1.9.1"
+    "morgan": "^1.10.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

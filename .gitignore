@@ -5,3 +5,6 @@ node_modules/
 # Env
 .env
 /generated/prisma
+
+# seed
+/prisma/seed.js
