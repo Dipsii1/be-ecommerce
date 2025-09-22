@@ -140,7 +140,6 @@ router.get('/me', verifyToken, async function (req, res) {
         address: true,
         latitude: true,
         longitude: true,
-        verified: true,
         createdAt: true,
       },
     });
