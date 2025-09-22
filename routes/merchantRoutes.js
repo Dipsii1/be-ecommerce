@@ -15,7 +15,6 @@ router.get('/', async function (req, res) {
         id: true,
         shopName: true,
         email: true,
-        password: true,
         address: true,
         latitude: true,
         longitude: true,
