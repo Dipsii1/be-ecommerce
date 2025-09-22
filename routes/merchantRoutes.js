@@ -15,6 +15,7 @@ router.get('/', async function (req, res) {
         id: true,
         shopName: true,
         email: true,
+        password: true,
         address: true,
         latitude: true,
         longitude: true,
@@ -78,12 +79,10 @@ router.post('/register', async function (req, res) {
       req.body;
 
     if (!email || !password || !shopName) {
-      return res
-        .status(400)
-        .json({
-          succes: false,
-          error: 'Email, password, dan shopName diperlukan',
-        });
+      return res.status(400).json({
+        succes: false,
+        error: 'Email, password, dan shopName diperlukan',
+      });
     }
 
     if (password.length < 6) {
@@ -117,13 +116,11 @@ router.post('/register', async function (req, res) {
     });
 
     const { password: _, ...merchantWithoutPassword } = newMerchant;
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: 'Merchant berhasil didaftarkan',
-        data: merchantWithoutPassword,
-      });
+    res.status(201).json({
+      success: true,
+      message: 'Merchant berhasil didaftarkan',
+      data: merchantWithoutPassword,
+    });
   } catch (error) {
     console.error('Error saat registrasi:', error);
     res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
@@ -199,12 +196,10 @@ router.get('/me', verifyMerchantToken, async function (req, res) {
     res.json(merchant);
   } catch (error) {
     console.error('Error saat mengambil data merchant:', error);
-    res
-      .status(500)
-      .json({
-        succes: false,
-        error: 'Terjadi kesalahan saat mengambil data merchant',
-      });
+    res.status(500).json({
+      succes: false,
+      error: 'Terjadi kesalahan saat mengambil data merchant',
+    });
   }
 });
 
