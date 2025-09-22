@@ -4,22 +4,32 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { verifyUserToken } = require('../middleware/auth');
 require('dotenv').config();
 
 // Get All Users
-router.get('/', async function (req, res) {
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      role: true,
-    },
-  });
-  res.json(users);
+router.get('/', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Error get users:', error);
+    res
+      .status(500)
+      .json({ success: false, error: 'Gagal mengambil data user' });
+  }
 });
 
-// Create user (register)
+// Register User
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -27,58 +37,68 @@ router.post('/register', async (req, res) => {
     if (!username || !email || !password) {
       return res
         .status(400)
-        .json({ error: 'Username, email, dan password diperlukan!' });
+        .json({
+          success: false,
+          error: 'Username, email, dan password diperlukan!',
+        });
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: 'Email sudah terdaftar' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email sudah terdaftar' });
+    }
+
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Password minimal 8 karakter' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
-      data: {
-        username,
-        email,
-        password: hashedPassword,
-        role: 'user', // default user
-      },
+      data: { username, email, password: hashedPassword, role: 'user' },
     });
 
     const { password: _, ...userWithoutPassword } = newUser;
-    res.status(201).json(userWithoutPassword);
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: 'Registrasi berhasil',
+        data: userWithoutPassword,
+      });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error register:', error);
+    res.status(500).json({ success: false, error: 'Gagal registrasi user' });
   }
 });
 
-// Login Endpoint
-router.post('/login', async function (req, res) {
-  console.log('JWT_SECRET:', process.env.JWT_SECRET);
-
+// Login User
+router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email dan password diperlukan' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email dan password diperlukan' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: 'Email atau password salah' });
+      return res
+        .status(401)
+        .json({ success: false, error: 'Email atau password salah' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
-
     if (!passwordMatch) {
-      return res.status(401).json({ error: 'Email atau password salah' });
+      return res
+        .status(401)
+        .json({ success: false, error: 'Email atau password salah' });
     }
 
     const token = jwt.sign(
@@ -88,85 +108,74 @@ router.post('/login', async function (req, res) {
     );
 
     const { password: _, ...userWithoutPassword } = user;
-
     res.json({
-      user: userWithoutPassword,
-      token,
+      success: true,
+      message: 'Login berhasil',
+      data: { user: userWithoutPassword, token },
     });
   } catch (error) {
-    console.error('Error saat login:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan saat login' });
+    console.error('Error login:', error);
+    res.status(500).json({ success: false, error: 'Gagal login user' });
   }
 });
 
 // Update User
-router.put('/update/:id', async function (req, res) {
+router.put('/update/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { username, email, password } = req.body;
 
-    // Prepare update data
     const updateData = {};
     if (username) updateData.username = username;
     if (email) updateData.email = email;
     if (password) updateData.password = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.update({
-      where: {
-        id: parseInt(id),
-      },
+      where: { id: parseInt(id) },
       data: updateData,
     });
 
-    // Jangan tampilkan password di response
     const { password: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+    res.json({
+      success: true,
+      message: 'User berhasil diperbarui',
+      data: userWithoutPassword,
+    });
   } catch (error) {
-    console.error('Error saat update user:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan saat memperbarui user' });
+    console.error('Error update user:', error);
+
+    if (error.code === 'P2025') {
+      // Prisma error: record not found
+      return res
+        .status(404)
+        .json({ success: false, error: 'User tidak ditemukan' });
+    }
+
+    res.status(500).json({ success: false, error: 'Gagal memperbarui user' });
   }
 });
 
 // Delete User
-router.delete('/delete/:id', async function (req, res) {
+router.delete('/delete/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const _ = await prisma.user.delete({
-      where: {
-        id: parseInt(id),
-      },
-    });
-    res.json({ message: 'User berhasil dihapus' });
+    await prisma.user.delete({ where: { id: parseInt(id) } });
+    res.json({ success: true, message: 'User berhasil dihapus' });
   } catch (error) {
-    console.error('Error saat menghapus user:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan saat menghapus user' });
+    console.error('Error delete user:', error);
+
+    if (error.code === 'P2025') {
+      return res
+        .status(404)
+        .json({ success: false, error: 'User tidak ditemukan' });
+    }
+
+    res.status(500).json({ success: false, error: 'Gagal menghapus user' });
   }
 });
 
-// Middleware untuk verifikasi token JWT
-const verifyToken = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token tidak ditemukan' });
-  }
-
-  const token = authHeader.split(' ')[1];
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.log(err);
-    return res
-      .status(401)
-      .json({ error: 'Token tidak valid atau sudah kadaluarsa' });
-  }
-};
-
-// Endpoint untuk mendapatkan profil user saat ini (dengan proteksi token)
-router.get('/me', verifyToken, async function (req, res) {
+// Get Current User Profile
+router.get('/me', verifyUserToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
@@ -175,20 +184,21 @@ router.get('/me', verifyToken, async function (req, res) {
         username: true,
         email: true,
         role: true,
-        // Tidak menampilkan password
       },
     });
 
     if (!user) {
-      return res.status(404).json({ error: 'User tidak ditemukan' });
+      return res
+        .status(404)
+        .json({ success: false, error: 'User tidak ditemukan' });
     }
 
-    res.json(user);
+    res.json({ success: true, data: user });
   } catch (error) {
-    console.error('Error saat mengambil data user:', error);
+    console.error('Error get profile:', error);
     res
       .status(500)
-      .json({ error: 'Terjadi kesalahan saat mengambil data user' });
+      .json({ success: false, error: 'Gagal mengambil profil user' });
   }
 });
 

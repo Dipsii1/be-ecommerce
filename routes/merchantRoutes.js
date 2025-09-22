@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { verifyMerchantToken } = require('../middleware/auth');
 require('dotenv').config();
 
 // Get All Merchants
@@ -20,10 +21,53 @@ router.get('/', async function (req, res) {
         createdAt: true,
       },
     });
-    res.json(merchants);
+    res.json({ succes: true, data: merchants });
   } catch (error) {
-    console.error('Error saat ambil merchant:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan saat ambil merchant' });
+    console.error('Error get merchants', error);
+    res
+      .status(500)
+      .json({ succes: false, error: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// Get Merchant + Products mereka
+router.get('/:id', async (req, res) => {
+  try {
+    const merchantId = parseInt(req.params.id);
+
+    const merchant = await prisma.merchantProfile.findUnique({
+      where: { id: merchantId },
+      select: {
+        id: true,
+        shopName: true,
+        email: true,
+        address: true,
+        products: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            stock: true,
+            expired: true,
+          },
+        },
+      },
+    });
+
+    if (!merchant) {
+      return res
+        .status(404)
+        .json({ success: false, error: 'Merchant tidak ditemukan' });
+    }
+
+    res.json({
+      success: true,
+      data: merchant,
+    });
+  } catch (error) {
+    console.error('Error get merchant with products:', error);
+    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
   }
 });
 
@@ -36,7 +80,16 @@ router.post('/register', async function (req, res) {
     if (!email || !password || !shopName) {
       return res
         .status(400)
-        .json({ error: 'Email, password, dan shopName diperlukan' });
+        .json({
+          succes: false,
+          error: 'Email, password, dan shopName diperlukan',
+        });
+    }
+
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Password minimal 8 karakter' });
     }
 
     const existingMerchant = await prisma.merchantProfile.findUnique({
@@ -44,7 +97,9 @@ router.post('/register', async function (req, res) {
     });
 
     if (existingMerchant) {
-      return res.status(400).json({ error: 'Email Merchant sudah terdaftar' });
+      return res
+        .status(400)
+        .json({ succes: false, error: 'Email Merchant sudah terdaftar' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -57,14 +112,21 @@ router.post('/register', async function (req, res) {
         address,
         latitude,
         longitude,
+        role: 'merchant', //default role
       },
     });
 
     const { password: _, ...merchantWithoutPassword } = newMerchant;
-    res.status(201).json(merchantWithoutPassword);
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: 'Merchant berhasil didaftarkan',
+        data: merchantWithoutPassword,
+      });
   } catch (error) {
     console.error('Error saat registrasi:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan saat registrasi' });
+    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
   }
 });
 
@@ -74,7 +136,9 @@ router.post('/login', async function (req, res) {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email dan password diperlukan' });
+      return res
+        .status(400)
+        .json({ succes: false, error: 'Email dan password diperlukan' });
     }
 
     const merchant = await prisma.merchantProfile.findUnique({
@@ -82,12 +146,16 @@ router.post('/login', async function (req, res) {
     });
 
     if (!merchant) {
-      return res.status(401).json({ error: 'Email atau password salah' });
+      return res
+        .status(401)
+        .json({ succes: false, error: 'Email atau password salah' });
     }
 
     const passwordMatch = await bcrypt.compare(password, merchant.password);
     if (!passwordMatch) {
-      return res.status(401).json({ error: 'Email atau password salah' });
+      return res
+        .status(401)
+        .json({ succes: false, error: 'Email atau password salah' });
     }
 
     const token = jwt.sign(
@@ -99,37 +167,18 @@ router.post('/login', async function (req, res) {
     const { password: _, ...merchantWithoutPassword } = merchant;
 
     res.json({
-      merchant: merchantWithoutPassword,
-      token,
+      success: true,
+      message: 'Login berhasil',
+      data: { merchant: merchantWithoutPassword, token },
     });
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: 'Terjadi kesalahan saat login merchant' });
+    console.log('error login', err);
+    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
   }
 });
 
-// Middleware untuk verifikasi token JWT
-const verifyToken = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token tidak ditemukan' });
-  }
-
-  const token = authHeader.split(' ')[1];
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.merchant = decoded; // simpan payload merchant
-    next();
-  } catch (error) {
-    console.error('Error saat login merchant:', error);
-    res.status(401).json({ error: 'Token tidak valid atau sudah kadaluarsa' });
-  }
-};
-
 // Get Current Merchant Profile
-router.get('/me', verifyToken, async function (req, res) {
+router.get('/me', verifyMerchantToken, async function (req, res) {
   try {
     const merchant = await prisma.merchantProfile.findUnique({
       where: { id: req.merchant.merchantId },
@@ -138,15 +187,13 @@ router.get('/me', verifyToken, async function (req, res) {
         shopName: true,
         email: true,
         address: true,
-        latitude: true,
-        longitude: true,
-        verified: true,
-        createdAt: true,
       },
     });
 
     if (!merchant) {
-      return res.status(404).json({ error: 'Merchant tidak ditemukan' });
+      return res
+        .status(404)
+        .json({ succes: false, error: 'Merchant tidak ditemukan' });
     }
 
     res.json(merchant);
@@ -154,7 +201,10 @@ router.get('/me', verifyToken, async function (req, res) {
     console.error('Error saat mengambil data merchant:', error);
     res
       .status(500)
-      .json({ error: 'Terjadi kesalahan saat mengambil data merchant' });
+      .json({
+        succes: false,
+        error: 'Terjadi kesalahan saat mengambil data merchant',
+      });
   }
 });
 

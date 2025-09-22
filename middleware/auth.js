@@ -1,33 +1,47 @@
+// middleware/auth.js
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
-// Middleware verifikasi token JWT
-const verifyToken = (req, res, next) => {
+// khusus User
+const verifyUserToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token tidak ditemukan' });
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token user tidak ditemukan' });
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
+    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // simpan payload token ke request
+    if (decoded.role !== 'user' && decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Akses hanya untuk user/admin' });
+    }
+    req.user = decoded; // { userId, email, role }
     next();
-  } catch (err) {
-    console.log(err);
-    return res.status(401).json({ error: 'Token tidak valid' });
+  } catch {
+    return res.status(401).json({ error: 'Token user tidak valid' });
   }
 };
 
-// Middleware tambahan untuk cek role
-const authorizeRoles = (...allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Akses ditolak' });
+// khusus Merchant
+const verifyMerchantToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token merchant tidak ditemukan' });
+  }
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'merchant' && decoded.role !== 'admin') {
+      return res
+        .status(403)
+        .json({ error: 'Akses hanya untuk merchant/admin' });
     }
+    req.merchant = decoded; // { merchantId, shopName, role }
     next();
-  };
+  } catch {
+    return res.status(401).json({ error: 'Token merchant tidak valid' });
+  }
 };
 
-module.exports = { verifyToken, authorizeRoles };
+module.exports = { verifyUserToken, verifyMerchantToken };
