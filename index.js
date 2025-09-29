@@ -1,58 +1,75 @@
 require('dotenv').config();
 
 // Import Module & Declare Variable
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+const fs = require('fs');
+const morgan = require('morgan');
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
 
-// import DB Conection
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/usersRoutes');
-var merchantRoutes = require('./routes/merchantRoutes');
-var productRoutes = require('./routes/productRoutes');
+// Swagger
+const { swaggerUi, specs } = require('./utils/swagger');
 
-var app = express();
+// import Routes
+const indexRouter = require('./routes/index');
+const usersRouter = require('./routes/usersRoutes');
+const merchantRoutes = require('./routes/merchantRoutes');
+const productRoutes = require('./routes/productRoutes');
 
+const app = express();
+
+// Middleware
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Define Routes
+// Routes
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/products', productRoutes);
 app.use('/merchants', merchantRoutes);
 
-// Handle Error
-app.use(function (req, res, next) {
-  next(createError(404));
-});
+// Loger
+const logDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir);
+}
 
-// error handler
-app.use((err, req, res) => {
-  const env = req.app.get('env');
-  const statusCode = err.status || 500;
+const accessLogStream = fs.createWriteStream(
+  path.join(__dirname, 'logs', 'access.log'),
+  { flags: 'a' }
+);
 
-  res.status(statusCode).json({
-    error: true,
-    message: err.message,
-    ...(env === 'development' && { stack: err.stack }),
-  });
-});
+app.use(
+  morgan('combined', accessLogStream, {
+    stream: {
+      write: (message) => logger.info(message.trim()),
+    },
+  })
+);
+
+// Swagger Docs
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 // Set port
+const chalk = require('chalk');
 const port = process.env.APP_PORT || 4000;
-
 const env = process.env.ENV_TYPE || 'production';
 
 if (env === 'development') {
-  // Start server
   app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(chalk.green.bold('🚀 Server is running!'));
+    console.log(`${chalk.blue('📌 Mode:')} ${chalk.yellow(env)}`);
+    console.log(`${chalk.blue('🌐 Port:')} ${chalk.cyan(port)}`);
+    console.log(
+      `${chalk.blue('📖 Swagger Docs:')} ${chalk.underline.cyan(`http://localhost:${port}/api-docs`)}`
+    );
+    console.log(
+      `${chalk.blue('📖 HTTPS:')} ${chalk.underline.cyan(`http://localhost:${port}`)}`
+    );
   });
 }
 
