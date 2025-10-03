@@ -1,4 +1,4 @@
-# 🛒 BE eCommerce
+# 🛒 BE E-Commerce
 
 [![Node.js](https://img.shields.io/badge/node-%3E%3D16-green?logo=node.js)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/express-4.x-blue?logo=express)](https://expressjs.com/)
@@ -15,7 +15,7 @@ Proyek ini dibuat modular agar mudah dikembangkan, dilengkapi dengan **Swagger A
 ## 🚀 Fitur Utama
 
 - **Authentication & Authorization**
-  - Registrasi, login, proteksi route dengan JWT (opsional jika sudah diimplementasikan).
+  - Registrasi, login, proteksi route dengan JWT.
 - **Manajemen Data**
   - CRUD Users
   - CRUD Merchants
@@ -55,4 +55,3 @@ be-ecommerce/
 ├── index.js              # Entry point aplikasi
 ├── package.json
 └── README.md
-    
