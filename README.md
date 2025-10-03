@@ -15,7 +15,7 @@ Proyek ini dibuat modular agar mudah dikembangkan, dilengkapi dengan **Swagger A
 ## 🚀 Fitur Utama
 
 - **Authentication & Authorization**
-  - Registrasi, login, proteksi route dengan JWT (opsional jika sudah diimplementasikan).
+  - Registrasi, login, proteksi route dengan JWT.
 - **Manajemen Data**
   - CRUD Users
   - CRUD Merchants
@@ -55,4 +55,3 @@ be-ecommerce/
 ├── index.js              # Entry point aplikasi
 ├── package.json
 └── README.md
-    
