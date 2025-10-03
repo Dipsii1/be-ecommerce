@@ -11,12 +11,26 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:8080', // sesuaikan dengan port
+        url: 'http://localhost:8080',
         description: 'Development server',
       },
     ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT', // format token yang digunakan
+        },
+      },
+    },
+    security: [
+      {
+        bearerAuth: [], // otomatis apply ke semua endpoint, bisa di override di level route
+      },
+    ],
   },
-  apis: ['./routes/*.js'], // Swagger akan baca semua file di folder routes
+  apis: ['./routes/*.js'],
 };
 
 const specs = swaggerJsdoc(options);

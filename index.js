@@ -1,30 +1,33 @@
 require('dotenv').config();
 
-// Import Module & Declare Variable
-const fs = require('fs');
-const morgan = require('morgan');
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
-const logger = require('morgan');
+const chalk = require('chalk');
 
 // Swagger
-const { swaggerUi, specs } = require('./utils/swagger');
+const { swaggerUi, specs } = require('./docs/swagger');
 
-// import Routes
+// Routes
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/usersRoutes');
 const merchantRoutes = require('./routes/merchantRoutes');
 const productRoutes = require('./routes/productRoutes');
 
+// Logger & Error Handler
+const { morganToWinston } = require('./utils/logger');
+const { notFound, errorHandler } = require('./middleware/errorHandler');
+
 const app = express();
 
-// Middleware
-app.use(logger('dev'));
+// Middleware umum
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Logger (Morgan → Winston)
+app.use(morganToWinston);
 
 // Routes
 app.use('/', indexRouter);
@@ -32,45 +35,33 @@ app.use('/users', usersRouter);
 app.use('/products', productRoutes);
 app.use('/merchants', merchantRoutes);
 
-// Loger
-const logDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir);
-}
-
-const accessLogStream = fs.createWriteStream(
-  path.join(__dirname, 'logs', 'access.log'),
-  { flags: 'a' }
-);
-
+// Swagger UI
 app.use(
-  morgan('combined', accessLogStream, {
-    stream: {
-      write: (message) => logger.info(message.trim()),
-    },
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(specs, {
+    explorer: true,
+    customSiteTitle: 'be-crafix API Docs',
+    customCss: '.swagger-ui .topbar { display: none }',
   })
 );
 
-// Swagger Docs
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+// Error handling
+app.use(notFound);
+app.use(errorHandler);
 
-// Set port
-const chalk = require('chalk');
+// Start Server
 const port = process.env.APP_PORT || 4000;
 const env = process.env.ENV_TYPE || 'production';
 
-if (env === 'development') {
-  app.listen(port, () => {
-    console.log(chalk.green.bold('🚀 Server is running!'));
-    console.log(`${chalk.blue('📌 Mode:')} ${chalk.yellow(env)}`);
-    console.log(`${chalk.blue('🌐 Port:')} ${chalk.cyan(port)}`);
-    console.log(
-      `${chalk.blue('📖 Swagger Docs:')} ${chalk.underline.cyan(`http://localhost:${port}/api-docs`)}`
-    );
-    console.log(
-      `${chalk.blue('📖 HTTPS:')} ${chalk.underline.cyan(`http://localhost:${port}`)}`
-    );
-  });
-}
+app.listen(port, () => {
+  // Console log dengan chalk
+  console.log(chalk.green.bold('🚀 Server is running!'));
+  console.log(`${chalk.blue('📌 Mode:')} ${chalk.yellow(env)}`);
+  console.log(`${chalk.blue('🌐 Port:')} ${chalk.cyan(port)}`);
+  console.log(
+    `${chalk.blue('📖 Swagger Docs:')} ${chalk.underline.cyan(`http://localhost:${port}/api-docs`)}`
+  );
+});
 
 module.exports = app;

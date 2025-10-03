@@ -5,6 +5,28 @@ const prisma = new PrismaClient();
 require('dotenv').config();
 const { verifyMerchantToken } = require('../middleware/auth');
 
+/**
+ * @swagger
+ * /products:
+ *   get:
+ *     summary: Get All Product
+ *     tags: [Product]
+ *     responses:
+ *       200:
+ *         description: List Product
+ */
+
+/**
+ * @swagger
+ * /products/{id}:
+ *   get:
+ *     summary: Get Product by ID
+ *     tags: [Product]
+ *     responses:
+ *       200:
+ *         description: List Product
+ */
+
 // Get All Products
 router.get('/', async function (req, res) {
   try {

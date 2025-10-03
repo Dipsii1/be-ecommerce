@@ -8,13 +8,17 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  email     String   @unique
+  id        Int       @id @default(autoincrement())
+  username  String    @unique
+  email     String    @unique
   password  String
-  role      String   @default("user")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role      String    @default("user")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relasi ke Cart & Order
+  carts     Cart[]
+  orders    Order[]
 
   @@map("users")
 }
@@ -51,5 +55,55 @@ model Product {
   // relasi ke MerchantProfile
   merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
+  // Relasi ke CartItem & OrderItem
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
   @@map("products")
+}
+
+model Cart {
+  id        Int       @id @default(autoincrement())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  items     CartItem[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  quantity  Int      @default(1)
+
+  @@map("cart_items")
+}
+
+model Order {
+  id        Int        @id @default(autoincrement())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  items     OrderItem[]
+  total     Float
+  status    String     @default("PENDING") // PENDING, PAID, SHIPPED, COMPLETED
+  createdAt DateTime   @default(now())
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  quantity  Int
+  price     Float
+
+  @@map("order_items")
 }

@@ -1,205 +1,200 @@
-var express = require('express');
-var router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const express = require('express');
+const router = express.Router();
+const merchantController = require('../controllers/merchantControllers');
 const { verifyMerchantToken } = require('../middleware/auth');
-require('dotenv').config();
 
-// Get All Merchants
-router.get('/', async function (req, res) {
-  try {
-    const merchants = await prisma.merchantProfile.findMany({
-      select: {
-        id: true,
-        shopName: true,
-        email: true,
-        address: true,
-        latitude: true,
-        longitude: true,
-        createdAt: true,
-      },
-    });
-    res.json({ succes: true, data: merchants });
-  } catch (error) {
-    console.error('Error get merchants', error);
-    res
-      .status(500)
-      .json({ succes: false, error: 'Terjadi kesalahan pada server' });
-  }
-});
+/**
+ * @swagger
+ * tags:
+ *   name: Merchants
+ *   description: Merchant management APIs
+ */
 
-// Get Merchant + Products mereka
-router.get('/:id', async (req, res) => {
-  try {
-    const merchantId = parseInt(req.params.id);
+/**
+ * @swagger
+ * /merchants:
+ *   get:
+ *     summary: Get all merchants
+ *     tags: [Merchants]
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved list of merchants
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/', merchantController.getAllMerchants);
 
-    const merchant = await prisma.merchantProfile.findUnique({
-      where: { id: merchantId },
-      select: {
-        id: true,
-        shopName: true,
-        email: true,
-        address: true,
-        products: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            price: true,
-            stock: true,
-            expired: true,
-          },
-        },
-      },
-    });
+/**
+ * @swagger
+ * /merchants/{id}:
+ *   get:
+ *     summary: Get merchant by ID
+ *     tags: [Merchants]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Merchant ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Merchant found
+ *       400:
+ *         description: Invalid ID format
+ *       404:
+ *         description: Merchant not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/:id', merchantController.getMerchantById);
 
-    if (!merchant) {
-      return res
-        .status(404)
-        .json({ success: false, error: 'Merchant tidak ditemukan' });
-    }
+/**
+ * @swagger
+ * /merchants/register:
+ *   post:
+ *     summary: Register a new merchant
+ *     tags: [Merchants]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - shopName
+ *               - email
+ *               - password
+ *             properties:
+ *               shopName:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Merchant registered successfully
+ *       400:
+ *         description: Missing or invalid data
+ *       409:
+ *         description: Email already exists
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/register', merchantController.registerMerchant);
 
-    res.json({
-      success: true,
-      data: merchant,
-    });
-  } catch (error) {
-    console.error('Error get merchant with products:', error);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
-  }
-});
+/**
+ * @swagger
+ * /merchants/login:
+ *   post:
+ *     summary: Login merchant
+ *     tags: [Merchants]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful, returns JWT token
+ *       400:
+ *         description: Invalid credentials
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/login', merchantController.loginMerchant);
 
-// Register Merchant
-router.post('/register', async function (req, res) {
-  try {
-    const { email, password, shopName, address, latitude, longitude } =
-      req.body;
+/**
+ * @swagger
+ * /merchants/update/{id}:
+ *   put:
+ *     summary: Update merchant by ID
+ *     tags: [Merchants]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Merchant ID
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               shopName:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Merchant updated successfully
+ *       400:
+ *         description: Invalid data or ID format
+ *       404:
+ *         description: Merchant not found
+ *       500:
+ *         description: Internal server error
+ */
+router.put('/update/:id', merchantController.updateMerchant);
 
-    if (!email || !password || !shopName) {
-      return res.status(400).json({
-        succes: false,
-        error: 'Email, password, dan shopName diperlukan',
-      });
-    }
+/**
+ * @swagger
+ * /merchants/delete/{id}:
+ *   delete:
+ *     summary: Delete merchant by ID
+ *     tags: [Merchants]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Merchant ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Merchant deleted successfully
+ *       400:
+ *         description: Invalid ID format
+ *       404:
+ *         description: Merchant not found
+ *       500:
+ *         description: Internal server error
+ */
+router.delete('/delete/:id', merchantController.deleteMerchant);
 
-    if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Password minimal 8 karakter' });
-    }
-
-    const existingMerchant = await prisma.merchantProfile.findUnique({
-      where: { email },
-    });
-
-    if (existingMerchant) {
-      return res
-        .status(400)
-        .json({ succes: false, error: 'Email Merchant sudah terdaftar' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newMerchant = await prisma.merchantProfile.create({
-      data: {
-        shopName,
-        email,
-        password: hashedPassword,
-        address,
-        latitude,
-        longitude,
-        role: 'merchant', //default role
-      },
-    });
-
-    const { password: _, ...merchantWithoutPassword } = newMerchant;
-    res.status(201).json({
-      success: true,
-      message: 'Merchant berhasil didaftarkan',
-      data: merchantWithoutPassword,
-    });
-  } catch (error) {
-    console.error('Error saat registrasi:', error);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
-  }
-});
-
-// Login Merchant
-router.post('/login', async function (req, res) {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ succes: false, error: 'Email dan password diperlukan' });
-    }
-
-    const merchant = await prisma.merchantProfile.findUnique({
-      where: { email },
-    });
-
-    if (!merchant) {
-      return res
-        .status(401)
-        .json({ succes: false, error: 'Email atau password salah' });
-    }
-
-    const passwordMatch = await bcrypt.compare(password, merchant.password);
-    if (!passwordMatch) {
-      return res
-        .status(401)
-        .json({ succes: false, error: 'Email atau password salah' });
-    }
-
-    const token = jwt.sign(
-      { merchantId: merchant.id, email: merchant.email, role: merchant.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    const { password: _, ...merchantWithoutPassword } = merchant;
-
-    res.json({
-      success: true,
-      message: 'Login berhasil',
-      data: { merchant: merchantWithoutPassword, token },
-    });
-  } catch (err) {
-    console.log('error login', err);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
-  }
-});
-
-// Get Current Merchant Profile
-router.get('/me', verifyMerchantToken, async function (req, res) {
-  try {
-    const merchant = await prisma.merchantProfile.findUnique({
-      where: { id: req.merchant.merchantId },
-      select: {
-        id: true,
-        shopName: true,
-        email: true,
-        address: true,
-      },
-    });
-
-    if (!merchant) {
-      return res
-        .status(404)
-        .json({ succes: false, error: 'Merchant tidak ditemukan' });
-    }
-
-    res.json(merchant);
-  } catch (error) {
-    console.error('Error saat mengambil data merchant:', error);
-    res.status(500).json({
-      succes: false,
-      error: 'Terjadi kesalahan saat mengambil data merchant',
-    });
-  }
-});
+/**
+ * @swagger
+ * /merchants/me:
+ *   get:
+ *     summary: Get current logged-in merchant's profile
+ *     tags: [Merchants]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved current merchant profile
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/me', verifyMerchantToken, merchantController.getCurrentMerchant);
 
 module.exports = router;
