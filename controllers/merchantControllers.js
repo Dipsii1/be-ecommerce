@@ -12,6 +12,7 @@ exports.getAllMerchants = async (req, res) => {
         id: true,
         shopName: true,
         email: true,
+        role: true,
         address: true,
         latitude: true,
         longitude: true,

@@ -60,7 +60,7 @@ app.listen(port, () => {
   console.log(`${chalk.blue('📌 Mode:')} ${chalk.yellow(env)}`);
   console.log(`${chalk.blue('🌐 Port:')} ${chalk.cyan(port)}`);
   console.log(
-    `${chalk.blue('📖 Swagger Docs:')} ${chalk.underline.cyan(`http://localhost:${port}/api-docs`)}`
+    `${chalk.blue('📖 Swagger Docs:')} ${chalk.underline.cyan(`http://localhost:${port}/api-docs/be-crafix`)}`
   );
 });
 

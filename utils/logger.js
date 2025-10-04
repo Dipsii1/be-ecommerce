@@ -1,58 +1,69 @@
-const morgan = require('morgan');
-const fs = require('fs');
-const path = require('path');
 const { createLogger, format, transports } = require('winston');
 require('winston-daily-rotate-file');
+const morgan = require('morgan');
+const path = require('path');
 
 const logDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
 
+// format log
 const logFormat = format.combine(
   format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   format.printf(
-    ({ level, message, timestamp }) =>
-      `${timestamp} [${level.toUpperCase()}]: ${message}`
+    (info) => `${info.timestamp} [${info.level.toUpperCase()}]: ${info.message}`
   )
 );
 
-// Logger Aplikasi
-const loggerApp = createLogger({
-  format: logFormat,
-  transports: [
-    new transports.Console({ level: 'debug' }),
-    new transports.DailyRotateFile({
-      filename: path.join(logDir, 'info-%DATE%.log'),
-      datePattern: 'YYYY-MM-DD',
-      maxFiles: '14d',
-      level: 'info',
-    }),
-    new transports.DailyRotateFile({
-      filename: path.join(logDir, 'error-%DATE%.log'),
-      datePattern: 'YYYY-MM-DD',
-      maxFiles: '14d',
-      level: 'error',
-    }),
-  ],
-});
+// Singleton loggerApp
+let loggerApp;
+if (!global.loggerApp) {
+  global.loggerApp = createLogger({
+    format: logFormat,
+    transports: [
+      // File log info (menyimpan info + warn + error)
+      new transports.DailyRotateFile({
+        filename: path.join(logDir, 'info-%DATE%.log'),
+        datePattern: 'YYYY-MM-DD',
+        maxFiles: '14d',
+        level: 'info', // info, warn, error masuk ke sini
+      }),
 
-// Logger Access
-const loggerAccess = createLogger({
-  format: logFormat,
-  transports: [
-    new transports.DailyRotateFile({
-      filename: path.join(logDir, 'access-%DATE%.log'),
-      datePattern: 'YYYY-MM-DD',
-      maxFiles: '14d',
-      level: 'http',
-    }),
-  ],
-});
+      // File log error khusus error
+      new transports.DailyRotateFile({
+        filename: path.join(logDir, 'error-%DATE%.log'),
+        datePattern: 'YYYY-MM-DD',
+        maxFiles: '14d',
+        level: 'error',
+      }),
+    ],
+  });
+}
+loggerApp = global.loggerApp;
 
-// Integrasi Morgan → loggerAccess
+// Singleton loggerAccess
+let loggerAccess;
+if (!global.loggerAccess) {
+  global.loggerAccess = createLogger({
+    format: logFormat,
+    transports: [
+      new transports.DailyRotateFile({
+        filename: path.join(logDir, 'access-%DATE%.log'),
+        datePattern: 'YYYY-MM-DD',
+        maxFiles: '14d',
+        level: 'http',
+      }),
+    ],
+  });
+}
+loggerAccess = global.loggerAccess;
+
+// Integrasi Morgan → langsung masuk ke info.log & access.log, tidak ke console
 const morganToWinston = morgan('combined', {
   stream: {
-    write: (message) => loggerAccess.http(message.trim()),
+    write: (message) => {
+      loggerAccess.http(message.trim()); // masuk ke access.log
+      loggerApp.info(message.trim()); // masuk ke info.log (tidak ke console)
+    },
   },
 });
 
-module.exports = { morganToWinston, loggerApp };
+module.exports = { loggerApp, morganToWinston };
