@@ -2,9 +2,8 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const logger = require('../utils/logger');
 
-// ✅ Get All Merchants
+// Get all merchants
 exports.getAllMerchants = async (req, res) => {
   try {
     const merchants = await prisma.merchantProfile.findMany({
@@ -17,21 +16,30 @@ exports.getAllMerchants = async (req, res) => {
         latitude: true,
         longitude: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
-    res.json({ success: true, data: merchants });
+
+    res.status(200).json({
+      success: true,
+      message: 'Merchants retrieved successfully',
+      data: merchants,
+    });
   } catch (error) {
-    console.error('Error get merchants', error);
-    res
-      .status(500)
-      .json({ success: false, error: 'Terjadi kesalahan pada server' });
+    console.error('❌ Error fetching merchants:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-//  Get Merchant + Products
+// Get merchant by ID (with products)
 exports.getMerchantById = async (req, res) => {
   try {
     const merchantId = parseInt(req.params.id);
+    if (isNaN(merchantId)) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Invalid merchant ID' });
+    }
 
     const merchant = await prisma.merchantProfile.findUnique({
       where: { id: merchantId },
@@ -40,6 +48,8 @@ exports.getMerchantById = async (req, res) => {
         shopName: true,
         email: true,
         address: true,
+        latitude: true,
+        longitude: true,
         products: {
           select: {
             id: true,
@@ -48,6 +58,10 @@ exports.getMerchantById = async (req, res) => {
             price: true,
             stock: true,
             expired: true,
+            isExpired: true,
+          },
+          where: {
+            OR: [{ isExpired: false }, { expired: { gt: new Date() } }],
           },
         },
       },
@@ -56,17 +70,21 @@ exports.getMerchantById = async (req, res) => {
     if (!merchant) {
       return res
         .status(404)
-        .json({ success: false, error: 'Merchant tidak ditemukan' });
+        .json({ success: false, error: 'Merchant not found' });
     }
 
-    res.json({ success: true, data: merchant });
+    res.status(200).json({
+      success: true,
+      message: 'Merchant retrieved successfully',
+      data: merchant,
+    });
   } catch (error) {
-    console.error('Error get merchant with products:', error);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
+    console.error('❌ Error retrieving merchant:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-//  Register Merchant
+// Register merchant
 exports.registerMerchant = async (req, res) => {
   try {
     const { email, password, shopName, address, latitude, longitude } =
@@ -75,14 +93,23 @@ exports.registerMerchant = async (req, res) => {
     if (!email || !password || !shopName) {
       return res.status(400).json({
         success: false,
-        error: 'Email, password, dan shopName diperlukan',
+        error: 'Email, password, and shopName are required',
       });
+    }
+
+    if (!email.includes('@')) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Invalid email format' });
     }
 
     if (password.length < 8) {
       return res
         .status(400)
-        .json({ success: false, error: 'Password minimal 8 karakter' });
+        .json({
+          success: false,
+          error: 'Password must be at least 8 characters',
+        });
     }
 
     const existingMerchant = await prisma.merchantProfile.findUnique({
@@ -91,11 +118,10 @@ exports.registerMerchant = async (req, res) => {
     if (existingMerchant) {
       return res
         .status(400)
-        .json({ success: false, error: 'Email Merchant sudah terdaftar' });
+        .json({ success: false, error: 'Email already registered' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const newMerchant = await prisma.merchantProfile.create({
       data: {
         shopName,
@@ -111,16 +137,16 @@ exports.registerMerchant = async (req, res) => {
     const { password: _, ...merchantWithoutPassword } = newMerchant;
     res.status(201).json({
       success: true,
-      message: 'Merchant berhasil didaftarkan',
+      message: 'Merchant registered successfully',
       data: merchantWithoutPassword,
     });
   } catch (error) {
-    console.error('Error saat registrasi:', error);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
+    console.error('❌ Error registering merchant:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-//  Login Merchant
+// Login merchant
 exports.loginMerchant = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -128,7 +154,7 @@ exports.loginMerchant = async (req, res) => {
     if (!email || !password) {
       return res
         .status(400)
-        .json({ success: false, error: 'Email dan password diperlukan' });
+        .json({ success: false, error: 'Email and password are required' });
     }
 
     const merchant = await prisma.merchantProfile.findUnique({
@@ -137,14 +163,14 @@ exports.loginMerchant = async (req, res) => {
     if (!merchant) {
       return res
         .status(401)
-        .json({ success: false, error: 'Email atau password salah' });
+        .json({ success: false, error: 'Invalid email or password' });
     }
 
     const passwordMatch = await bcrypt.compare(password, merchant.password);
     if (!passwordMatch) {
       return res
         .status(401)
-        .json({ success: false, error: 'Email atau password salah' });
+        .json({ success: false, error: 'Invalid email or password' });
     }
 
     const token = jwt.sign(
@@ -155,18 +181,18 @@ exports.loginMerchant = async (req, res) => {
 
     const { password: _, ...merchantWithoutPassword } = merchant;
 
-    res.json({
+    res.status(200).json({
       success: true,
-      message: 'Login berhasil',
+      message: 'Login successful',
       data: { merchant: merchantWithoutPassword, token },
     });
-  } catch (err) {
-    console.error('error login', err);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
+  } catch (error) {
+    console.error('❌ Error during login:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-// Update Merchant
+// Update merchant
 exports.updateMerchant = async (req, res) => {
   try {
     const { id } = req.params;
@@ -174,7 +200,6 @@ exports.updateMerchant = async (req, res) => {
       req.body;
 
     const updateData = {};
-
     if (shopName) updateData.shopName = shopName;
     if (email) updateData.email = email;
     if (address) updateData.address = address;
@@ -182,60 +207,58 @@ exports.updateMerchant = async (req, res) => {
     if (longitude) updateData.longitude = parseFloat(longitude);
     if (password) updateData.password = await bcrypt.hash(password, 10);
 
+    if (Object.keys(updateData).length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'No fields to update' });
+    }
+
     const merchant = await prisma.merchantProfile.update({
       where: { id: parseInt(id) },
       data: updateData,
     });
 
-    // hilangkan password dari response
     const { password: _, ...merchantWithoutPassword } = merchant;
 
-    logger?.info(`Merchant berhasil diupdate: ID ${id}`);
-    res.json({
+    res.status(200).json({
       success: true,
-      message: 'Merchant berhasil diperbarui',
+      message: 'Merchant updated successfully',
       data: merchantWithoutPassword,
     });
   } catch (error) {
     if (error.code === 'P2025') {
-      logger?.warn(
-        `Update gagal: merchant tidak ditemukan (ID ${req.params.id})`
-      );
       return res
         .status(404)
-        .json({ success: false, error: 'Merchant tidak ditemukan' });
+        .json({ success: false, error: 'Merchant not found' });
     }
 
-    logger?.error(`Update error: ${error.message}`, { stack: error.stack });
-    res
-      .status(500)
-      .json({ success: false, error: 'Gagal memperbarui merchant' });
+    console.error('❌ Error updating merchant:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-//  Delete Merchant
+// Delete merchant
 exports.deleteMerchant = async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.merchantProfile.delete({ where: { id: parseInt(id) } });
-    logger.info(`merchant berhasil dihapus: ID ${id}`);
-    res.json({ success: true, message: 'User berhasil dihapus' });
+
+    res
+      .status(200)
+      .json({ success: true, message: 'Merchant deleted successfully' });
   } catch (error) {
     if (error.code === 'P2025') {
-      logger.warn(
-        `Delete gagal: Merchant tidak ditemukan (ID ${req.params.id})`
-      );
       return res
         .status(404)
-        .json({ success: false, error: 'merchant tidak ditemukan' });
+        .json({ success: false, error: 'Merchant not found' });
     }
 
-    logger.error(`Delete error: ${error.message}`, { stack: error.stack });
-    res.status(500).json({ success: false, error: 'Gagal menghapus merchant' });
+    console.error('❌ Error deleting merchant:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-//  Get Current Merchant Profile
+// Get current logged-in merchant profile
 exports.getCurrentMerchant = async (req, res) => {
   try {
     const merchant = await prisma.merchantProfile.findUnique({
@@ -245,18 +268,20 @@ exports.getCurrentMerchant = async (req, res) => {
         shopName: true,
         email: true,
         address: true,
+        latitude: true,
+        longitude: true,
       },
     });
 
     if (!merchant) {
       return res
         .status(404)
-        .json({ success: false, error: 'Merchant tidak ditemukan' });
+        .json({ success: false, error: 'Merchant not found' });
     }
 
-    res.json({ success: true, data: merchant });
+    res.status(200).json({ success: true, data: merchant });
   } catch (error) {
-    console.error('Error saat mengambil data merchant:', error);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
+    console.error('❌ Error fetching current merchant:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

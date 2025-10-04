@@ -2,9 +2,9 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const logger = require('../utils/logger');
+const { loggerApp: logger } = require('../utils/logger'); // gunakan loggerApp
 
-// Get all Users
+// Get all users
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -17,21 +17,30 @@ exports.getAllUsers = async (req, res) => {
         updatedAt: true,
       },
     });
-    res.json({ success: true, data: users });
+
+    logger.info(`Fetched ${users.length} users`);
+    res.status(200).json({
+      success: true,
+      message: 'Users retrieved successfully',
+      data: users,
+    });
   } catch (error) {
-    logger.error(`GET /users gagal: ${error.message}`, { stack: error.stack });
-    res
-      .status(500)
-      .json({ success: false, error: 'Gagal mengambil data user' });
+    logger.error(`Error fetching users: ${error.message}`, {
+      stack: error.stack,
+    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-// Get User by ID
+// Get user by ID
 exports.getUserById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
+    if (isNaN(id))
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+
     const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) },
+      where: { id },
       select: {
         id: true,
         username: true,
@@ -43,50 +52,63 @@ exports.getUserById = async (req, res) => {
     });
 
     if (!user) {
-      logger.warn(`GET /users/${id} - User tidak ditemukan`);
-      return res
-        .status(404)
-        .json({ success: false, error: 'User tidak ditemukan' });
+      logger.warn(`User not found (ID: ${id})`);
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    logger.info(`GET /users/${id} - Berhasil diambil`, { userId: id });
-    res.json({ success: true, data: user });
+    res
+      .status(200)
+      .json({ success: true, message: 'User retrieved', data: user });
   } catch (error) {
-    logger.error(`GET /users/${req.params.id} gagal: ${error.message}`, {
+    logger.error(`Error fetching user: ${error.message}`, {
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({ success: false, error: 'Gagal mengambil data user' });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-// Register User
+// Register user
 exports.registerUser = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
     if (!username || !email || !password) {
-      logger.warn('Register gagal: data tidak lengkap');
       return res.status(400).json({
         success: false,
-        error: 'Username, email, dan password diperlukan!',
+        error: 'Username, email, and password are required',
       });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      logger.warn(`Register gagal: email sudah terdaftar (${email})`);
+    if (!email.includes('@')) {
       return res
         .status(400)
-        .json({ success: false, error: 'Email sudah terdaftar' });
+        .json({ success: false, error: 'Invalid email format' });
     }
 
     if (password.length < 8) {
-      logger.warn('Register gagal: password kurang dari 8 karakter');
       return res
         .status(400)
-        .json({ success: false, error: 'Password minimal 8 karakter' });
+        .json({
+          success: false,
+          error: 'Password must be at least 8 characters',
+        });
+    }
+
+    const [existingUserByEmail, existingUserByUsername] = await Promise.all([
+      prisma.user.findUnique({ where: { email } }),
+      prisma.user.findUnique({ where: { username } }),
+    ]);
+
+    if (existingUserByEmail) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email already registered' });
+    }
+
+    if (existingUserByUsername) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Username already taken' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -95,44 +117,44 @@ exports.registerUser = async (req, res) => {
     });
 
     const { password: _, ...userWithoutPassword } = newUser;
-    logger.info(`User berhasil register: ${username} (${email})`);
+    logger.info(`User registered: ${email}`);
+
     res.status(201).json({
       success: true,
-      message: 'Registrasi berhasil',
+      message: 'User registered successfully',
       data: userWithoutPassword,
     });
   } catch (error) {
-    logger.error(`Register error: ${error.message}`, { stack: error.stack });
-    res.status(500).json({ success: false, error: 'Gagal registrasi user' });
+    logger.error(`Error registering user: ${error.message}`, {
+      stack: error.stack,
+    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-// Login User
+// Login user
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      logger.warn('Login gagal: email atau password kosong');
       return res
         .status(400)
-        .json({ success: false, error: 'Email dan password diperlukan' });
+        .json({ success: false, error: 'Email and password are required' });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      logger.warn(`Login gagal: email tidak ditemukan (${email})`);
       return res
         .status(401)
-        .json({ success: false, error: 'Email atau password salah' });
+        .json({ success: false, error: 'Invalid email or password' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      logger.warn(`Login gagal: password salah (${email})`);
       return res
         .status(401)
-        .json({ success: false, error: 'Email atau password salah' });
+        .json({ success: false, error: 'Invalid email or password' });
     }
 
     const token = jwt.sign(
@@ -142,23 +164,27 @@ exports.loginUser = async (req, res) => {
     );
 
     const { password: _, ...userWithoutPassword } = user;
-    logger.info(`Login berhasil: ${email}`);
-    res.json({
+    logger.info(`User login: ${email}`);
+
+    res.status(200).json({
       success: true,
-      message: 'Login berhasil',
+      message: 'Login successful',
       data: { user: userWithoutPassword, token },
     });
   } catch (error) {
-    logger.error(`Login error: ${error.message}`, { stack: error.stack });
-    res.status(500).json({ success: false, error: 'Gagal login user' });
+    logger.error(`Error login user: ${error.message}`, { stack: error.stack });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-// Update User
+// Update user
 exports.updateUser = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const { username, email, password } = req.body;
+
+    if (isNaN(id))
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
 
     const updateData = {};
     if (username) updateData.username = username;
@@ -166,51 +192,51 @@ exports.updateUser = async (req, res) => {
     if (password) updateData.password = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.update({
-      where: { id: parseInt(id) },
+      where: { id },
       data: updateData,
     });
 
     const { password: _, ...userWithoutPassword } = user;
-    logger.info(`User berhasil diupdate: ID ${id}`);
-    res.json({
+    res.status(200).json({
       success: true,
-      message: 'User berhasil diperbarui',
+      message: 'User updated successfully',
       data: userWithoutPassword,
     });
   } catch (error) {
     if (error.code === 'P2025') {
-      logger.warn(`Update gagal: user tidak ditemukan (ID ${req.params.id})`);
-      return res
-        .status(404)
-        .json({ success: false, error: 'User tidak ditemukan' });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    logger.error(`Update error: ${error.message}`, { stack: error.stack });
-    res.status(500).json({ success: false, error: 'Gagal memperbarui user' });
+    logger.error(`Error updating user: ${error.message}`, {
+      stack: error.stack,
+    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
 // Delete user
 exports.deleteUser = async (req, res) => {
   try {
-    const { id } = req.params;
-    await prisma.user.delete({ where: { id: parseInt(id) } });
-    logger.info(`User berhasil dihapus: ID ${id}`);
-    res.json({ success: true, message: 'User berhasil dihapus' });
+    const id = parseInt(req.params.id);
+    await prisma.user.delete({ where: { id } });
+
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully',
+    });
   } catch (error) {
     if (error.code === 'P2025') {
-      logger.warn(`Delete gagal: user tidak ditemukan (ID ${req.params.id})`);
-      return res
-        .status(404)
-        .json({ success: false, error: 'User tidak ditemukan' });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    logger.error(`Delete error: ${error.message}`, { stack: error.stack });
-    res.status(500).json({ success: false, error: 'Gagal menghapus user' });
+    logger.error(`Error deleting user: ${error.message}`, {
+      stack: error.stack,
+    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
-// Get current logged-in user profile
+// Get current logged-in user
 exports.getCurrentUser = async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -224,20 +250,18 @@ exports.getCurrentUser = async (req, res) => {
     });
 
     if (!user) {
-      logger.warn(
-        `Profile gagal: user tidak ditemukan (ID ${req.user.userId})`
-      );
-      return res
-        .status(404)
-        .json({ success: false, error: 'User tidak ditemukan' });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    logger.info(`Profile berhasil diambil: ID ${req.user.userId}`);
-    res.json({ success: true, data: user });
+    res.status(200).json({
+      success: true,
+      message: 'Current user retrieved successfully',
+      data: user,
+    });
   } catch (error) {
-    logger.error(`Get profile error: ${error.message}`, { stack: error.stack });
-    res
-      .status(500)
-      .json({ success: false, error: 'Gagal mengambil profil user' });
+    logger.error(`Error fetching current user: ${error.message}`, {
+      stack: error.stack,
+    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

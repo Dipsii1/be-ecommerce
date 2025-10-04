@@ -8,35 +8,35 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  username  String    @unique
-  email     String    @unique
-  password  String
-  role      String    @default("user")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         Int       @id @default(autoincrement())
+  username   String    @unique
+  email      String    @unique
+  password   String
+  role       String    @default("user")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  // Relasi ke Cart & Order
-  carts     Cart[]
-  orders    Order[]
+  // Relations
+  carts      Cart[]
+  orders     Order[]
 
   @@map("users")
 }
 
 model MerchantProfile {
-  id        Int      @id @default(autoincrement())
-  shopName  String
-  email     String   @unique
-  password  String   
-  address   String?
-  latitude  Float?
-  longitude Float?
-  role      String   @default("merchant")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int       @id @default(autoincrement())
+  shopName   String
+  email      String    @unique
+  password   String
+  address    String?
+  latitude   Float?
+  longitude  Float?
+  role       String    @default("merchant")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  // relasi ke Product (1:N)
-  products Product[]
+  // Relations
+  products   Product[]
 
   @@map("merchant_profiles")
 }
@@ -45,65 +45,72 @@ model Product {
   id          Int       @id @default(autoincrement())
   name        String
   description String?
+  category    String?         // 🍱 e.g. "Snack", "Drink", "Frozen Food"
+  imageUrl    String?         // 📸 URL of the product image
   price       Float
   stock       Int       @default(0)
-  expired     DateTime?
+  expired     DateTime?       // ⏰ Expiration date
+  isExpired   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   merchantId  Int
 
-  // relasi ke MerchantProfile
-  merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  // Relations
+  merchant    MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
 
-  // Relasi ke CartItem & OrderItem
-  cartItems  CartItem[]
-  orderItems OrderItem[]
-
+  @@index([expired])
+  @@index([name])
   @@map("products")
 }
 
 model Cart {
-  id        Int       @id @default(autoincrement())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
-  items     CartItem[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      CartItem[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@map("carts")
 }
 
 model CartItem {
-  id        Int      @id @default(autoincrement())
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  cartId    Int
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId Int
-  quantity  Int      @default(1)
+  id         Int      @id @default(autoincrement())
+  cartId     Int
+  productId  Int
+  quantity   Int      @default(1)
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("cart_items")
 }
 
 model Order {
-  id        Int        @id @default(autoincrement())
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
-  items     OrderItem[]
-  total     Float
-  status    String     @default("PENDING") // PENDING, PAID, SHIPPED, COMPLETED
-  createdAt DateTime   @default(now())
+  id             Int        @id @default(autoincrement())
+  userId         Int
+  total          Float
+  status         String     @default("PENDING") // PENDING, PAID, SHIPPED, COMPLETED, CANCELLED
+  paymentMethod  String?                      // CASH, TRANSFER, EWALLET
+  createdAt      DateTime   @default(now())
+  completedAt    DateTime?                    // When the order is finished
 
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items          OrderItem[]
+
+  @@index([status])
   @@map("orders")
 }
 
 model OrderItem {
-  id        Int      @id @default(autoincrement())
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId   Int
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId Int
-  quantity  Int
-  price     Float
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  productId  Int
+  quantity   Int
+  price      Float
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
 }

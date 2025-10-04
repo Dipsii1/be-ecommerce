@@ -7,7 +7,7 @@ const { verifyMerchantToken } = require('../middleware/auth');
  * @swagger
  * tags:
  *   name: Merchants
- *   description: Merchant management APIs
+ *   description: Merchant management and authentication
  */
 
 /**
@@ -18,7 +18,7 @@ const { verifyMerchantToken } = require('../middleware/auth');
  *     tags: [Merchants]
  *     responses:
  *       200:
- *         description: Successfully retrieved list of merchants
+ *         description: List of all merchants
  *       500:
  *         description: Internal server error
  */
@@ -28,20 +28,20 @@ router.get('/', merchantController.getAllMerchants);
  * @swagger
  * /merchants/{id}:
  *   get:
- *     summary: Get merchant by ID
+ *     summary: Get merchant by ID (with product list)
  *     tags: [Merchants]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         description: Merchant ID
  *         schema:
- *           type: string
+ *           type: integer
+ *           example: 1
  *     responses:
  *       200:
- *         description: Merchant found
+ *         description: Merchant details retrieved successfully
  *       400:
- *         description: Invalid ID format
+ *         description: Invalid merchant ID
  *       404:
  *         description: Merchant not found
  *       500:
@@ -68,17 +68,27 @@ router.get('/:id', merchantController.getMerchantById);
  *             properties:
  *               shopName:
  *                 type: string
+ *                 example: "Crafix Coffee"
  *               email:
  *                 type: string
+ *                 example: "merchant@crafix.com"
  *               password:
  *                 type: string
+ *                 example: "SecurePass123"
+ *               address:
+ *                 type: string
+ *                 example: "Jl. Sudirman No. 45, Jakarta"
+ *               latitude:
+ *                 type: number
+ *                 example: -6.21462
+ *               longitude:
+ *                 type: number
+ *                 example: 106.84513
  *     responses:
  *       201:
  *         description: Merchant registered successfully
  *       400:
- *         description: Missing or invalid data
- *       409:
- *         description: Email already exists
+ *         description: Invalid input or email already registered
  *       500:
  *         description: Internal server error
  */
@@ -88,7 +98,7 @@ router.post('/register', merchantController.registerMerchant);
  * @swagger
  * /merchants/login:
  *   post:
- *     summary: Login merchant
+ *     summary: Login a merchant and get JWT token
  *     tags: [Merchants]
  *     requestBody:
  *       required: true
@@ -102,15 +112,17 @@ router.post('/register', merchantController.registerMerchant);
  *             properties:
  *               email:
  *                 type: string
+ *                 example: "merchant@crafix.com"
  *               password:
  *                 type: string
+ *                 example: "SecurePass123"
  *     responses:
  *       200:
- *         description: Login successful, returns JWT token
+ *         description: Login successful
  *       400:
- *         description: Invalid credentials
+ *         description: Missing fields
  *       401:
- *         description: Unauthorized
+ *         description: Invalid credentials
  *       500:
  *         description: Internal server error
  */
@@ -126,9 +138,9 @@ router.post('/login', merchantController.loginMerchant);
  *       - in: path
  *         name: id
  *         required: true
- *         description: Merchant ID
  *         schema:
- *           type: string
+ *           type: integer
+ *           example: 2
  *     requestBody:
  *       required: true
  *       content:
@@ -138,15 +150,25 @@ router.post('/login', merchantController.loginMerchant);
  *             properties:
  *               shopName:
  *                 type: string
+ *                 example: "Updated Shop Name"
  *               email:
  *                 type: string
+ *                 example: "newemail@shop.com"
  *               password:
  *                 type: string
+ *                 example: "NewPassword123"
+ *               address:
+ *                 type: string
+ *                 example: "Jl. Diponegoro No. 99, Bandung"
+ *               latitude:
+ *                 type: number
+ *                 example: -6.2
+ *               longitude:
+ *                 type: number
+ *                 example: 106.8
  *     responses:
  *       200:
  *         description: Merchant updated successfully
- *       400:
- *         description: Invalid data or ID format
  *       404:
  *         description: Merchant not found
  *       500:
@@ -164,14 +186,12 @@ router.put('/update/:id', merchantController.updateMerchant);
  *       - in: path
  *         name: id
  *         required: true
- *         description: Merchant ID
  *         schema:
- *           type: string
+ *           type: integer
+ *           example: 3
  *     responses:
  *       200:
  *         description: Merchant deleted successfully
- *       400:
- *         description: Invalid ID format
  *       404:
  *         description: Merchant not found
  *       500:
@@ -189,9 +209,11 @@ router.delete('/delete/:id', merchantController.deleteMerchant);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Successfully retrieved current merchant profile
+ *         description: Merchant profile retrieved successfully
  *       401:
- *         description: Unauthorized - Invalid or missing token
+ *         description: Unauthorized
+ *       404:
+ *         description: Merchant not found
  *       500:
  *         description: Internal server error
  */
